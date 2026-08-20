@@ -46,7 +46,7 @@ Ollama models, `.env`, AWS credentials, and PostgreSQL passwords are not committ
 
 ## SQL Data Layer
 
-SQL provides a durable, queryable analytics layer between the cleaned CSV data and a future Power BI dashboard. The existing Streamlit AI analyst remains independent and continues to analyze uploaded datasets.
+SQL provides a durable, queryable analytics layer between the cleaned CSV data and the completed four-page Power BI dashboard: Executive Overview, Regional Analysis, Customer Analysis, and Product Analysis. The existing Streamlit AI analyst remains independent and continues to analyze uploaded datasets.
 
 ```text
 CSV
@@ -125,7 +125,7 @@ Python ETL
   ↓
 SQL Database
   ↓
-Power BI (planned)
+Completed Power BI dashboard
 ```
 
 ### Pipeline modes
