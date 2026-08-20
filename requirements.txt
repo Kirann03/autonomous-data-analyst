@@ -1,0 +1,12 @@
+﻿# Direct application and pipeline dependencies. Transitive packages are resolved by pip.
+boto3
+numpy
+pandas
+plotly
+psycopg2-binary
+pypdf
+python-dotenv
+pytest
+requests
+sqlalchemy
+streamlit
