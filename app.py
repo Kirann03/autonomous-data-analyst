@@ -1,4 +1,5 @@
 import streamlit as st
+import json
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -17,6 +18,7 @@ from src.categorical_analysis import get_bottom_category
 from src.dataset_profiler import profile_dataset
 from src.dataset_profiler import create_ai_context
 from src.agent_engine import PlanValidationError, run_autonomous_analysis
+from src.data_sources.api_source import fetch_api_data
 
 
 st.set_page_config(
@@ -38,33 +40,51 @@ st.divider()
 
 st.header("📁 Upload Your Dataset")
 
-uploaded_file = st.file_uploader(
-    "Upload a CSV or Excel file",
-    type=["csv", "xlsx"]
-)
+source_type = st.selectbox("Data source", ["CSV / XLSX", "API"], key="data_source_type")
+df = None
+
+if source_type == "CSV / XLSX":
+    uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
+    if uploaded_file is not None:
+        try:
+            df = pd.read_csv(uploaded_file, encoding="latin1") if uploaded_file.name.lower().endswith(".csv") else pd.read_excel(uploaded_file)
+            st.success(f"Successfully loaded: {uploaded_file.name}")
+        except Exception:
+            st.error("Unable to load the selected file. Verify that it is a valid CSV or XLSX file.")
+else:
+    with st.form("api_source_form", border=True):
+        api_url = st.text_input("API URL", placeholder="https://api.example.com/sales")
+        api_params = st.text_area("Query parameters (JSON, optional)", placeholder='{"limit": 100}')
+        api_headers = st.text_area("Request headers (JSON, optional)", placeholder='{"Accept": "application/json"}')
+        fetch_api = st.form_submit_button("Fetch data", type="primary")
+    if fetch_api:
+        try:
+            params = json.loads(api_params) if api_params.strip() else None
+            headers = json.loads(api_headers) if api_headers.strip() else None
+            if params is not None and not isinstance(params, dict):
+                raise ValueError("Query parameters must be a JSON object.")
+            if headers is not None and not isinstance(headers, dict):
+                raise ValueError("Request headers must be a JSON object.")
+            with st.spinner("Fetching API data..."):
+                api_result = fetch_api_data(api_url, params=params, headers=headers)
+            if api_result.status == "success":
+                st.session_state["api_source_df"] = api_result.dataframe
+                st.session_state["api_source_metadata"] = api_result.metadata
+                st.success("API dataset loaded")
+            else:
+                st.error(api_result.error or "Invalid API response.")
+        except (ValueError, json.JSONDecodeError) as error:
+            st.error(f"API input is invalid: {error}")
+    if "api_source_df" in st.session_state:
+        df = st.session_state["api_source_df"]
+        st.success(f"API dataset loaded — Rows: {len(df):,}; Columns: {len(df.columns)}")
+        with st.expander("API dataset details"):
+            st.json(st.session_state.get("api_source_metadata", {}).get("data_quality", {}))
 
 
-if uploaded_file is not None:
+if df is not None:
 
     try:
-
-        if uploaded_file.name.lower().endswith(".csv"):
-
-            df = pd.read_csv(
-                uploaded_file,
-                encoding="latin1"
-            )
-
-        else:
-
-            df = pd.read_excel(
-                uploaded_file
-            )
-
-
-        st.success(
-            f"Successfully loaded: {uploaded_file.name}"
-        )
 
 
         st.divider()
@@ -1172,9 +1192,9 @@ if uploaded_file is not None:
                             )
                         except PlanValidationError as error:
                             st.session_state["autonomous_analysis_error"] = str(error)
-                        except Exception as error:
+                        except Exception:
                             st.session_state["autonomous_analysis_error"] = (
-                                f"Controlled analysis could not complete: {error}"
+                                "Controlled analysis could not complete. Please try again."
                             )
 
             if "autonomous_analysis_error" in st.session_state:
@@ -1182,8 +1202,24 @@ if uploaded_file is not None:
 
             autonomous_result = st.session_state.get("autonomous_analysis_result")
             if autonomous_result:
+                analysis_mode = (
+                    "Autonomous Agent"
+                    if autonomous_result["mode"] == "agent"
+                    else "Deterministic"
+                )
+                st.caption(f"Analysis mode: {analysis_mode}")
+                st.caption(f"Planning method: {autonomous_result.get('planning_method', 'deterministic')}")
                 st.subheader("Answer")
                 st.markdown(autonomous_result["answer"])
+                root_cause = autonomous_result.get("root_cause")
+                if root_cause:
+                    st.subheader("Root cause / drivers")
+                    st.write(root_cause["observation"])
+                    st.write("**Evidence**")
+                    for item in root_cause["evidence"]:
+                        st.write(f"- {item}")
+                    st.write("**Interpretation:** " + root_cause["interpretation"])
+                    st.write("**Recommendation:** " + root_cause["recommendation"])
                 visualization = autonomous_result["visualization"]
                 st.subheader("Recommended visualization")
                 st.write(
@@ -1216,10 +1252,10 @@ if uploaded_file is not None:
             )
 
 
-    except Exception as e:
+    except Exception:
 
         st.error(
-            f"Unable to process the dataset: {e}"
+            "Unable to process the dataset. Verify the data format and try again."
         )
 
 else:

@@ -15,6 +15,22 @@ def find_column(df, text):
     return None
 
 
+def _dimension_ranking_answer(df, question, *, ascending):
+    """Answer a ranking question with both the business dimension and value."""
+    numeric_columns = df.select_dtypes(include="number").columns.tolist()
+    categorical_columns = df.select_dtypes(include=["object", "string", "category"]).columns.tolist()
+    dimension = next((column for column in categorical_columns if str(column).lower() in question), None)
+    metric = next((column for column in numeric_columns if str(column).lower() in question), None)
+    if not dimension or not metric:
+        return None
+    ranked = df.groupby(dimension, dropna=False)[metric].sum().sort_values(ascending=ascending)
+    if ranked.empty:
+        return None
+    name, value = ranked.index[0], ranked.iloc[0]
+    label = "lowest" if ascending else "highest"
+    return f"The {label} '{metric}' is for {dimension} '{name}': {value:,.2f}."
+
+
 def query_dataset(df, question):
 
     if df is None or df.empty:
@@ -172,6 +188,10 @@ def query_dataset(df, question):
 
     if top_match:
 
+        ranked_answer = _dimension_ranking_answer(df, q, ascending=False)
+        if ranked_answer:
+            return ranked_answer
+
         n = (
             int(top_match.group(1))
             if top_match.group(1)
@@ -229,6 +249,10 @@ def query_dataset(df, question):
 
 
     if bottom_match:
+
+        ranked_answer = _dimension_ranking_answer(df, q, ascending=True)
+        if ranked_answer:
+            return ranked_answer
 
         n = (
             int(bottom_match.group(1))

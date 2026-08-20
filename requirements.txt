@@ -1,6 +1,7 @@
 ﻿# Direct application and pipeline dependencies. Transitive packages are resolved by pip.
 boto3
 numpy
+openai
 pandas
 plotly
 psycopg2-binary

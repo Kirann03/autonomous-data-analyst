@@ -1,15 +1,16 @@
-"""AI analysis prompts backed by the shared local Ollama client."""
+"""AI analysis prompts backed by the selected LLM provider."""
 
 import json
 
-from src.ollama_client import OllamaError, generate_text
+from src.llm.base import LLMProviderError
+from src.llm.factory import get_llm_provider
 
 
 def ask_llama(prompt: str) -> str:
-    """Keep the existing text-returning interface while using central configuration."""
+    """Compatibility wrapper for existing AI features using the selected provider."""
     try:
-        return generate_text(prompt)
-    except OllamaError as error:
+        return get_llm_provider().generate_narrative(prompt)
+    except LLMProviderError as error:
         return f"❌ AI error: {error}"
 
 
